@@ -145,7 +145,7 @@ class CharactersConfig(Coqpit):
     eos: str = None
     bos: str = None
     blank: str = None
-    characters: str = None
+    characters: list = None
     punctuations: str = None
     phonemes: str = None
     is_unique: bool = True  # for backwards compatibility of models trained with char sets with duplicates

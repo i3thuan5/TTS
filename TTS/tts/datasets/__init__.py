@@ -147,6 +147,27 @@ def load_tts_samples(
         formatter = None
     return meta_data_train_all, meta_data_eval_all
 
+def format_hat_tts_dataset(dataset, num_proc=4, sample_rate=16000):
+    all_column_names = set()
+    for column_names in dataset.column_names:
+        all_column_names.add(column_names)
+    dataset = dataset.remove_columns(
+        all_column_names - set(["audio", "ipa", "speaker", "language", "audio_unique_name"])
+    )
+    dataset = dataset.filter(lambda x: x["ipa"] is not None and "<OOV>" not in x["ipa"], num_proc=num_proc)
+
+    def ipa_parse(ipa):
+        ipa = ipa.replace("-", "")
+        ipa = ipa.replace("_", "")
+        ipa = ipa.replace("，", " ， ")
+        return ipa
+
+    dataset = dataset.map(lambda x: {"ipa": ipa_parse(x["ipa"])}, num_proc=num_proc)
+    dataset = dataset.cast_column("audio", Audio(sampling_rate=sample_rate))
+    dataset = dataset.rename_column("ipa", "text")
+    dataset = dataset.rename_column("speaker", "speaker_name")
+
+    return dataset
 
 def load_attention_mask_meta_data(metafile_path):
     """Load meta data file created by compute_attention_masks.py"""

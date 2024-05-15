@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import xml.etree.ElementTree as ET
 from glob import glob
 from pathlib import Path
@@ -652,4 +653,66 @@ def bel_tts_formatter(root_path, meta_file, **kwargs):  # pylint: disable=unused
             wav_file = os.path.join(root_path, cols[0])
             text = cols[1]
             items.append({"text": text, "audio_file": wav_file, "speaker_name": speaker_name, "root_path": root_path})
+    return items
+
+def parse_ipa_hat_tts(ipa: str):
+    text = []
+    delete_chars="\-\_\|\+"
+    # delete_chars="\+\-\|\_"
+    as_space=""
+    
+    ipa_list = re.split(r"(?<![\d])(?=[\d])|(?<=[\d])(?![\d])", ipa)
+    for word in ipa_list:
+        if word.isdigit():
+            text.append(word)
+        else:
+            if len(as_space) > 0:
+                word = re.sub(r"[{}]".format(as_space), " ", word)
+            if len(delete_chars) > 0:
+                word = re.sub(r"[{}]".format(delete_chars), "", word)
+                
+            word = word.replace("，", " ， ")
+            word = re.sub(r"\s+" , " ", word)
+            # word = word.replace("，", " ")
+            text.extend(word)
+
+    return text
+
+def hat_tts(root_path, meta_file, ignored_speakers=None):  # pylint: disable=unused-argument
+    json_file = os.path.join(root_path, meta_file)
+    items = []
+    with open(json_file, "r", encoding="utf-8") as f:
+        json_lines = f.readlines()
+        json_lines = f"[{','.join(json_lines)}]"
+        unprocess_items = json.loads(json_lines)
+        for unprocess_item in unprocess_items:
+            speaker_name = unprocess_item["speaker"]
+            if ignored_speakers is not None and speaker_name in ignored_speakers:
+                continue
+            audio_file = os.path.join(root_path, unprocess_item["audio_path"])
+            if "OOV" in unprocess_item["ipa"] or unprocess_item["ipa"] is None:
+                continue
+            # text = unprocess_item["ipa"].replace("-", "").replace("_", "").replace("，", " ， ")
+            text = parse_ipa_hat_tts(unprocess_item["ipa"])
+            # tone as a separate token
+              
+            items.append({"text": text, "audio_file": audio_file, "speaker_name": speaker_name, "root_path": root_path})
+    return items
+
+def hakka_tts_general(root_path, meta_file, **kwargs):
+    json_file = os.path.join(root_path, meta_file)
+    items = []
+    with open(json_file, "r", encoding="utf-8") as f:
+        json_lines = f.readlines()
+        json_lines = f"[{','.join(json_lines)}]"
+        unprocess_items = json.loads(json_lines)
+        for unprocess_item in unprocess_items:
+            speaker_name = meta_file.split(".")[0] # use the file name as speaker name
+            audio_file = os.path.join(root_path, unprocess_item["audio_path"])
+            if "OOV" in unprocess_item["ipa"] or unprocess_item["ipa"] is None:
+                continue
+            text = parse_ipa_hat_tts(unprocess_item["ipa"])
+            # tone as a separate token
+              
+            items.append({"text": text, "audio_file": audio_file, "speaker_name": speaker_name, "root_path": root_path})
     return items
