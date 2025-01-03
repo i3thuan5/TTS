@@ -952,3 +952,51 @@ def hakka_tts_general(root_path, meta_file, **kwargs):
                 }
             )
     return items
+
+
+def parse_ipa_formosan(ipa: str):
+    ipa = (
+        ipa.replace("-", "")
+        .replace("g", "ɡ")
+        .replace("ʦ", "t͡s")
+        .replace("ʨ", "t͡ɕ")
+        .replace("R", "ʀ")
+        .replace("ʤ", "dʒ")
+        .replace(" <sil>", ", ")
+    )
+    ipa = ipa.strip()
+    ipa = re.sub(r"\s+", " ", ipa)
+    return ipa
+
+
+def formosan(root_path, meta_file, **kwargs):
+    json_file = os.path.join(root_path, meta_file)
+    items = []
+    with open(json_file, "r", encoding="utf-8") as f:
+        json_lines = f.readlines()
+        json_lines = f"[{','.join(json_lines)}]"
+        unprocess_items = json.loads(json_lines)
+        for unprocess_item in unprocess_items:
+            speaker_name = (
+                os.path.basename(meta_file).split(".")[0]
+                + "#"
+                + unprocess_item["audio_path"]
+            )
+            if "ithuan" in meta_file:
+                speaker_name = meta_file.split(".")[0].replace("_concat", "")
+
+            root_path = os.path.dirname(json_file)
+
+            audio_file = os.path.join(root_path, unprocess_item["audio_path"])
+
+            text = parse_ipa_formosan(unprocess_item["ipa"])
+
+            items.append(
+                {
+                    "text": text,
+                    "audio_file": audio_file,
+                    "speaker_name": speaker_name,
+                    "root_path": root_path,
+                }
+            )
+    return items
