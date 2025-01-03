@@ -29,10 +29,17 @@ _punctuations = "!'(),-.:;? "
 _vowels = "iyɨʉɯuɪʏʊeøɘəɵɤoɛœɜɞʌɔæɐaɶɑɒᵻ"
 _non_pulmonic_consonants = "ʘɓǀɗǃʄǂɠǁʛ"
 _pulmonic_consonants = "pbtdʈɖcɟkɡqɢʔɴŋɲɳnɱmʙrʀⱱɾɽɸβfvθðszʃʒʂʐçʝxɣχʁħʕhɦɬɮʋɹɻjɰlɭʎʟ"
-_suprasegmentals = "ˈˌːˑ"
+_suprasegmentals = "ˈˌːˑ͡"
 _other_symbols = "ʍwɥʜʢʡɕʑɺɧʲ"
 _diacrilics = "ɚ˞ɫ"
-_phonemes = _vowels + _non_pulmonic_consonants + _pulmonic_consonants + _suprasegmentals + _other_symbols + _diacrilics
+_phonemes = (
+    _vowels
+    + _non_pulmonic_consonants
+    + _pulmonic_consonants
+    + _suprasegmentals
+    + _other_symbols
+    + _diacrilics
+)
 
 
 class BaseVocabulary:
@@ -44,7 +51,14 @@ class BaseVocabulary:
         vocab (Dict): A dictionary of characters and their corresponding indices.
     """
 
-    def __init__(self, vocab: Dict, pad: str = None, blank: str = None, bos: str = None, eos: str = None):
+    def __init__(
+        self,
+        vocab: Dict,
+        pad: str = None,
+        blank: str = None,
+        bos: str = None,
+        eos: str = None,
+    ):
         self.vocab = vocab
         self.pad = pad
         self.blank = blank
@@ -88,13 +102,18 @@ class BaseVocabulary:
             self._vocab = vocab
             self._char_to_id = {char: idx for idx, char in enumerate(self._vocab)}
             self._id_to_char = {
-                idx: char for idx, char in enumerate(self._vocab)  # pylint: disable=unnecessary-comprehension
+                idx: char
+                for idx, char in enumerate(self._vocab)  # pylint: disable=unnecessary-comprehension
             }
 
     @staticmethod
     def init_from_config(config, **kwargs):
         """Initialize from the given config."""
-        if config.characters is not None and "vocab_dict" in config.characters and config.characters.vocab_dict:
+        if (
+            config.characters is not None
+            and "vocab_dict" in config.characters
+            and config.characters.vocab_dict
+        ):
             return (
                 BaseVocabulary(
                     config.characters.vocab_dict,
@@ -270,7 +289,8 @@ class BaseCharacters:
         self._vocab = vocab
         self._char_to_id = {char: idx for idx, char in enumerate(self.vocab)}
         self._id_to_char = {
-            idx: char for idx, char in enumerate(self.vocab)  # pylint: disable=unnecessary-comprehension
+            idx: char
+            for idx, char in enumerate(self.vocab)  # pylint: disable=unnecessary-comprehension
         }
 
     @property
@@ -284,10 +304,26 @@ class BaseCharacters:
         if self.is_sorted:
             _vocab = sorted(_vocab)
         _vocab = list(_vocab)
-        _vocab = [self._blank] + _vocab if self._blank is not None and len(self._blank) > 0 else _vocab
-        _vocab = [self._bos] + _vocab if self._bos is not None and len(self._bos) > 0 else _vocab
-        _vocab = [self._eos] + _vocab if self._eos is not None and len(self._eos) > 0 else _vocab
-        _vocab = [self._pad] + _vocab if self._pad is not None and len(self._pad) > 0 else _vocab
+        _vocab = (
+            [self._blank] + _vocab
+            if self._blank is not None and len(self._blank) > 0
+            else _vocab
+        )
+        _vocab = (
+            [self._bos] + _vocab
+            if self._bos is not None and len(self._bos) > 0
+            else _vocab
+        )
+        _vocab = (
+            [self._eos] + _vocab
+            if self._eos is not None and len(self._eos) > 0
+            else _vocab
+        )
+        _vocab = (
+            [self._pad] + _vocab
+            if self._pad is not None and len(self._pad) > 0
+            else _vocab
+        )
         self.vocab = _vocab + list(self._punctuations)
         if self.is_unique:
             duplicates = {x for x in self.vocab if self.vocab.count(x) > 1}
@@ -388,7 +424,9 @@ class IPAPhonemes(BaseCharacters):
         is_unique: bool = False,
         is_sorted: bool = True,
     ) -> None:
-        super().__init__(characters, punctuations, pad, eos, bos, blank, is_unique, is_sorted)
+        super().__init__(
+            characters, punctuations, pad, eos, bos, blank, is_unique, is_sorted
+        )
 
     @staticmethod
     def init_from_config(config: "Coqpit"):
@@ -399,7 +437,10 @@ class IPAPhonemes(BaseCharacters):
         """
         # band-aid for compatibility with old models
         if "characters" in config and config.characters is not None:
-            if "phonemes" in config.characters and config.characters.phonemes is not None:
+            if (
+                "phonemes" in config.characters
+                and config.characters.phonemes is not None
+            ):
                 config.characters["characters"] = config.characters["phonemes"]
             return (
                 IPAPhonemes(
@@ -463,7 +504,9 @@ class Graphemes(BaseCharacters):
         is_unique: bool = False,
         is_sorted: bool = True,
     ) -> None:
-        super().__init__(characters, punctuations, pad, eos, bos, blank, is_unique, is_sorted)
+        super().__init__(
+            characters, punctuations, pad, eos, bos, blank, is_unique, is_sorted
+        )
 
     @staticmethod
     def init_from_config(config: "Coqpit"):
