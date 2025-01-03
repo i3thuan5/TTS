@@ -1,3 +1,4 @@
+import math
 import os
 import sys
 from collections import Counter
@@ -30,9 +31,11 @@ def split_dataset(items, eval_split_max_size=None, eval_split_size=0.01):
         eval_split_size = int(eval_split_size)
     else:
         if eval_split_max_size:
-            eval_split_size = min(eval_split_max_size, int(len(items) * eval_split_size))
+            eval_split_size = min(
+                eval_split_max_size, math.ceil(len(items) * eval_split_size)
+            )
         else:
-            eval_split_size = int(len(items) * eval_split_size)
+            eval_split_size = math.ceil(len(items) * eval_split_size)
 
     assert (
         eval_split_size > 0
@@ -45,12 +48,20 @@ def split_dataset(items, eval_split_max_size=None, eval_split_size=0.01):
         items_eval = []
         speakers = [item["speaker_name"] for item in items]
         speaker_counter = Counter(speakers)
+        all_speaker_one_sample = True
+        for count in speaker_counter.values():
+            if count > 1:
+                all_speaker_one_sample = False
+                break
         while len(items_eval) < eval_split_size:
             item_idx = np.random.randint(0, len(items))
             speaker_to_be_removed = items[item_idx]["speaker_name"]
             if speaker_counter[speaker_to_be_removed] > 1:
                 items_eval.append(items[item_idx])
                 speaker_counter[speaker_to_be_removed] -= 1
+                del items[item_idx]
+            elif all_speaker_one_sample:
+                items_eval.append(items[item_idx])
                 del items[item_idx]
         return items_eval, items
     return items[:eval_split_size], items[eval_split_size:]
@@ -61,7 +72,9 @@ def add_extra_keys(metadata, language, dataset_name):
         # add language name
         item["language"] = language
         # add unique audio name
-        relfilepath = os.path.splitext(os.path.relpath(item["audio_file"], item["root_path"]))[0]
+        relfilepath = os.path.splitext(
+            os.path.relpath(item["audio_file"], item["root_path"])
+        )[0]
         audio_unique_name = f"{dataset_name}#{relfilepath}"
         item["audio_unique_name"] = audio_unique_name
     return metadata
@@ -117,25 +130,39 @@ def load_tts_samples(
         if formatter is None:
             formatter = _get_formatter_by_name(formatter_name)
         # load train set
-        meta_data_train = formatter(root_path, meta_file_train, ignored_speakers=ignored_speakers)
-        assert len(meta_data_train) > 0, f" [!] No training samples found in {root_path}/{meta_file_train}"
+        meta_data_train = formatter(
+            root_path, meta_file_train, ignored_speakers=ignored_speakers
+        )
+        assert (
+            len(meta_data_train) > 0
+        ), f" [!] No training samples found in {root_path}/{meta_file_train}"
 
         meta_data_train = add_extra_keys(meta_data_train, language, dataset_name)
 
         print(f" | > Found {len(meta_data_train)} files in {Path(root_path).resolve()}")
         # load evaluation split if set
-        if eval_split:
+        if eval_split and (meta_file_val or eval_split_size > 0):
             if meta_file_val:
-                meta_data_eval = formatter(root_path, meta_file_val, ignored_speakers=ignored_speakers)
+                meta_data_eval = formatter(
+                    root_path, meta_file_val, ignored_speakers=ignored_speakers
+                )
                 meta_data_eval = add_extra_keys(meta_data_eval, language, dataset_name)
             else:
-                eval_size_per_dataset = eval_split_max_size // len(datasets) if eval_split_max_size else None
-                meta_data_eval, meta_data_train = split_dataset(meta_data_train, eval_size_per_dataset, eval_split_size)
+                eval_size_per_dataset = (
+                    eval_split_max_size // len(datasets)
+                    if eval_split_max_size
+                    else None
+                )
+                meta_data_eval, meta_data_train = split_dataset(
+                    meta_data_train, eval_size_per_dataset, eval_split_size
+                )
             meta_data_eval_all += meta_data_eval
         meta_data_train_all += meta_data_train
         # load attention masks for the duration predictor training
         if dataset.meta_file_attn_mask:
-            meta_data = dict(load_attention_mask_meta_data(dataset["meta_file_attn_mask"]))
+            meta_data = dict(
+                load_attention_mask_meta_data(dataset["meta_file_attn_mask"])
+            )
             for idx, ins in enumerate(meta_data_train_all):
                 attn_file = meta_data[ins["audio_file"]].strip()
                 meta_data_train_all[idx].update({"alignment_file": attn_file})
@@ -147,14 +174,18 @@ def load_tts_samples(
         formatter = None
     return meta_data_train_all, meta_data_eval_all
 
+
 def format_hat_tts_dataset(dataset, num_proc=4, sample_rate=16000):
     all_column_names = set()
     for column_names in dataset.column_names:
         all_column_names.add(column_names)
     dataset = dataset.remove_columns(
-        all_column_names - set(["audio", "ipa", "speaker", "language", "audio_unique_name"])
+        all_column_names
+        - set(["audio", "ipa", "speaker", "language", "audio_unique_name"])
     )
-    dataset = dataset.filter(lambda x: x["ipa"] is not None and "<OOV>" not in x["ipa"], num_proc=num_proc)
+    dataset = dataset.filter(
+        lambda x: x["ipa"] is not None and "<OOV>" not in x["ipa"], num_proc=num_proc
+    )
 
     def ipa_parse(ipa):
         ipa = ipa.replace("-", "")
@@ -168,6 +199,7 @@ def format_hat_tts_dataset(dataset, num_proc=4, sample_rate=16000):
     dataset = dataset.rename_column("speaker", "speaker_name")
 
     return dataset
+
 
 def load_attention_mask_meta_data(metafile_path):
     """Load meta data file created by compute_attention_masks.py"""
@@ -198,5 +230,7 @@ def find_unique_chars(data_samples, verbose=True):
         print(f" > Number of unique characters: {len(chars)}")
         print(f" > Unique characters: {''.join(sorted(chars))}")
         print(f" > Unique lower characters: {''.join(sorted(lower_chars))}")
-        print(f" > Unique all forced to lower characters: {''.join(sorted(chars_force_lower))}")
+        print(
+            f" > Unique all forced to lower characters: {''.join(sorted(chars_force_lower))}"
+        )
     return chars_force_lower
